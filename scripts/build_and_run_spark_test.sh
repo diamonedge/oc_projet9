@@ -1,5 +1,4 @@
 #!/bin/sh
-set -euo pipefail
 
 echo "################################################# Cleaning data part"
 sudo chown -R "$(id -u):$(id -g)" data || true
@@ -12,7 +11,8 @@ docker compose down || true
 docker compose rm -f || true
 docker rm -f producer_container 2>/dev/null || true
 docker ps -a
-docker compose build --no-cache spark-processor producer redpanda
+#docker compose build --no-cache spark-processor producer redpanda
+docker compose build spark-processor producer redpanda
 
 echo "################################################ Prepping tests"
 date
