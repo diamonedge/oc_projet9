@@ -4,7 +4,6 @@ from pyspark.sql import DataFrame, SparkSession
 from pyspark.sql.functions import col, from_json, to_timestamp, when
 from pyspark.sql.types import StringType, StructField, StructType
 
-
 BOOTSTRAP_SERVERS = os.getenv("REDPANDA_BOOTSTRAP_SERVERS", "localhost:19092")
 TOPIC = os.getenv("REDPANDA_TOPIC", "client_tickets")
 OUTPUT_BASE_DIR = os.getenv("SPARK_OUTPUT_BASE_DIR", "data/output")
@@ -12,7 +11,7 @@ CHECKPOINT_DIR = os.getenv(
     "SPARK_CHECKPOINT_DIR",
     "data/checkpoint/ticket_stream_processor",
 )
-
+TRIGGER_PROCESSING_TIME = os.getenv("SPARK_TRIGGER_PROCESSING_TIME", "5 seconds")
 
 ticket_schema = StructType(
     [
@@ -42,9 +41,13 @@ def enrich_tickets(df: DataFrame) -> DataFrame:
 
 
 def write_batch(batch_df: DataFrame, batch_id: int) -> None:
-    if batch_df.rdd.isEmpty():
+    ticket_count = batch_df.count()
+
+    if ticket_count == 0:
         print(f"[batch_id={batch_id}] Aucun ticket à traiter.")
         return
+
+    print(f"[batch_id={batch_id}] Nombre de tickets reçus : {ticket_count}")
 
     enriched_df = enrich_tickets(batch_df).cache()
 
@@ -54,26 +57,27 @@ def write_batch(batch_df: DataFrame, batch_id: int) -> None:
 
     enriched_df.write.mode("append").json(enriched_output)
 
-    (
+    by_type_df = (
         enriched_df.groupBy("request_type", "support_team")
         .count()
-        .coalesce(1)
-        .write.mode("overwrite")
-        .json(by_type_output)
+        .orderBy("request_type")
     )
 
-    (
+    by_priority_df = (
         enriched_df.groupBy("priority")
         .count()
-        .coalesce(1)
-        .write.mode("overwrite")
-        .json(by_priority_output)
+        .orderBy("priority")
     )
 
-    print(f"[batch_id={batch_id}] Tickets traités et exportés.")
+    by_type_df.coalesce(1).write.mode("overwrite").json(by_type_output)
+    print(f"[batch_id={batch_id}] Agrégation par type exportée : {by_type_output}")
+
+    by_priority_df.coalesce(1).write.mode("overwrite").json(by_priority_output)
+    print(f"[batch_id={batch_id}] Agrégation par priorité exportée : {by_priority_output}")
 
     enriched_df.unpersist()
 
+    print(f"[batch_id={batch_id}] Traitement terminé.")
 
 def main() -> None:
     spark = (
@@ -102,7 +106,7 @@ def main() -> None:
     query = (
         tickets_stream.writeStream.foreachBatch(write_batch)
         .option("checkpointLocation", CHECKPOINT_DIR)
-        .trigger(processingTime="10 seconds")
+        .trigger(processingTime=TRIGGER_PROCESSING_TIME)
         .start()
     )
 

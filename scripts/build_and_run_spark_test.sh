@@ -1,9 +1,7 @@
 echo "################################################# Cleaning data part"
-sudo rm -rf data/
-mkdir -p data/checkpoint/ticket_stream_processor/
-mkdir -p data/output/enriched_tickets/
-mkdir -p data/output/latest/tickets_by_priority/
-mkdir -p data/output/latest/tickets_by_type/
+sudo chown -R "$(id -u):$(id -g)" data
+rm -rf data/output/* data/checkpoint/*
+mkdir -p data/output data/checkpoint
 
 echo "################################################ Building dockers from local"
 date
@@ -11,8 +9,8 @@ docker compose down
 docker compose rm
 docker rm producer_container
 docker ps -a
-#docker compose build --no-cache spark-processor producer redpanda
-docker compose build spark-processor producer repanda
+docker compose build --no-cache spark-processor producer redpanda
+#docker compose build spark-processor producer repanda
 
 echo "################################################ Prepping tests"
 date
