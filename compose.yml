@@ -45,5 +45,38 @@ services:
       echo "Creating topic client_tickets if needed..."
       rpk topic list -X brokers=redpanda:9092
     restart: "no"
+  producer:
+    build:
+      context: .
+      dockerfile: producer/Dockerfile
+    container_name: ticket-producer
+    environment:
+      REDPANDA_BOOTSTRAP_SERVERS: redpanda:9092
+      REDPANDA_TOPIC: client_tickets
+      TICKET_PRODUCER_INTERVAL: "0.2"
+      TICKET_PRODUCER_LIMIT: "20"
+      TICKET_CLIENT_COUNT: "100"
+    depends_on:
+      redpanda:
+        condition: service_healthy
+    restart: "no"
+
+  spark-processor:
+    build:
+      context: .
+      dockerfile: spark/Dockerfile
+    container_name: spark-ticket-processor
+    environment:
+      REDPANDA_BOOTSTRAP_SERVERS: redpanda:9092
+      REDPANDA_TOPIC: client_tickets
+      SPARK_OUTPUT_BASE_DIR: /app/data/output
+      SPARK_CHECKPOINT_DIR: /app/data/checkpoint/ticket_stream_processor
+    volumes:
+      - ./data/output:/app/data/output
+      - ./data/checkpoint:/app/data/checkpoint
+    depends_on:
+      redpanda:
+        condition: service_healthy
+    restart: "no"      
 volumes:
   redpanda_data:
