@@ -1,0 +1,1 @@
+FROM redpandadata/redpanda:latest
