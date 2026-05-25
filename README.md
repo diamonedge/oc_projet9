@@ -220,7 +220,7 @@ mkdir -p data/output data/checkpoint
 Lien de démonstration :
 
 ```text
-À compléter : lien YouTube, Loom ou autre support vidéo.
+https://youtu.be/PHfxdLfoGZc
 ```
 
 La vidéo doit montrer :
